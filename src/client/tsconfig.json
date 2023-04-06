@@ -1,0 +1,13 @@
+{
+    "compilerOptions": {
+        "target": "es2020",
+        "outDir": "../../out/client",
+        "removeComments": true,
+        "declaration": true,
+        "moduleResolution": "nodenext",
+        "baseUrl": ".",
+        "paths": {
+            "assets": ["../../out/assets.d.ts"]
+        }
+    }
+}

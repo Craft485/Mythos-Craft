@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Playing: Mythos Craft</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="shortcut icon" href="../favicon.png" type="image/x-icon">
+    <script src="game-main.js" defer></script>
+</head>
+<body>
+    <article id="content">
+        <row id="opponent-hand">
+            <health class="health-display-container"><span class="health-display">100</span></health>
+        </row>
+        <row id="opponent-played"></row>
+        <div id="played-item"></div>
+        <row id="my-played"></row>
+        <row id="my-hand">
+            <health class="health-display-container"><span class="health-display">100</span></health>
+        </row>
+        <button type="submit" id="submit">End Turn</button>
+        <div id="resource-display-container">
+            <p id="resource-display">Energy: <span id="resource-display-count">0</span></p>
+        </div>
+    </article>
+</body>
+</html>

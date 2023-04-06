@@ -1,0 +1,8 @@
+node_modules 
+*.sh 
+*.old.* 
+test
+*.txt
+out
+src/config.json
+public/bg 

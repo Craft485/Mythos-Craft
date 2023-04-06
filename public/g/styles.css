@@ -1,0 +1,217 @@
+:root {
+    --row-border-width: 1px
+}
+
+html, body {
+    margin: 0; 
+    padding: 0;
+    background: grey; 
+    background-image: url("../bg/black-gold-marble-texture.jpg");
+    background-repeat: no-repeat;
+    background-size: cover;
+    color: white;
+    height: 100%;
+    width: 100%;
+    user-select: none;
+    font-family: sans-serif;
+}
+
+#content {
+    height: 100%;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    /* Align horizontally */
+    justify-content: center;
+    /* Align vertically */
+    align-items: center;
+}
+
+row {
+    height: calc(90% / 4);
+    display: flex;
+    width: calc(100% - 2 * var(--row-border-width));
+    border: var(--row-border-width) solid gold;
+    justify-content: center;
+}
+
+.health-display-container {
+    position: absolute;
+    left: 0;
+    right: 0;
+    z-index: 5;
+    text-align: center;
+}
+
+.health-display {
+    width: fit-content;
+    background-color: white;
+    color: black;
+    padding: 5px;
+    border-radius: 15px;
+    border: 3px solid white;
+}
+
+#opponent-hand > .health-display-container {
+    top: calc((90% - 35px)/4);
+}
+
+#my-hand > .health-display-container {
+    transform: translateY(-50%);
+}
+
+#submit {
+    font-size: 300%;
+    color: white;
+    align-self: flex-end;
+    height: 10%;
+    width: 25%;
+    background: linear-gradient(to bottom, var(--color-start), var(--color-end));
+    margin: auto;
+    border-radius: 15px;
+}
+
+#submit:hover {
+    cursor: pointer;
+}
+
+.card-data {
+    color: darkcyan;
+}
+
+.card:hover {
+    cursor: pointer;
+}
+
+.moving {
+    animation: move 2s ease;
+}
+
+@keyframes move {
+    100% {
+        /* Variables used here are determined via JS in order to have this work on different screen sizes */
+        transform: translate(
+            calc(var(--new-x) - var(--current-x)), 
+            calc(var(--new-y) - var(--current-y))
+        );
+    }
+}
+
+.unavailable {
+    opacity: 0.25;
+}
+
+.unavailable:hover {
+    cursor: not-allowed !important;
+}
+
+.card {
+    position: relative;
+    background-color: rgb(98, 98, 98);
+    border: 3px solid black;
+    border-radius: 10px;
+    height: 95%;
+    width: 10%;
+    margin: auto 0.5%;
+    text-align: center;
+}
+
+.card > div {
+    position: absolute;
+    left: 0;
+    margin-top: 0;
+    right: 0;
+    bottom: 15px;
+}
+
+.card-b {
+    background-color: rgb(102, 37, 0);
+    background-size: contain;
+    background-repeat: no-repeat;
+    width: 10%;
+    background-position: center;
+}
+
+#opponent-played .card-select-for-action {
+    border-color: red;
+}
+
+#my-played .card-select-for-action {
+    border-color: green;
+}
+
+#played-item {
+    position: absolute;
+    left: 5px;
+    z-index: 6;
+    height: calc(90% / 4);
+    margin: auto;
+    display: flex;
+    width: 10%;
+    justify-content: center;
+    border-radius: 15px;
+}
+
+#played-item .card {
+    width: 100% !important;
+}
+
+.card-cost-display { color: rgb(112, 191, 218); }
+.card-health-display  { color: rgb(100, 200, 125); }
+.card-attack-display  { color: rgb(255, 100, 100); }
+
+.card-select-for-action { 
+    border-color: green; 
+    border-style: dashed;
+}
+
+.game-end-overlay {
+    display: flex;
+    position: absolute;
+    z-index: 10;
+    top: 0;
+    right: 0;
+    left: 0;
+    bottom: 0;
+    text-align: center;
+    /* Must use an alpha value other wise the children of this element cannot have an opacity greater than that of its parent if it were to be set here using "opacity: 50%;" */
+    background-color: rgba(0, 0, 0, 0.5);
+}
+
+#overlay-content {
+    margin: auto;
+    width: fit-content;
+    height: fit-content;
+    background: #727272;
+    border-radius: 15px;
+    padding: 10px;
+}
+
+#overlay-content > button {
+    margin-top: 5px;
+    border-radius: 15px;
+    padding: 5px;
+    background-color: #5d5d5d;
+    color: white;
+}
+
+a {
+    text-decoration: none;
+    color: inherit;
+}
+
+#resource-display-container {
+    position: absolute;
+    z-index: 3;
+    left: 0;
+    width: 50%;
+    bottom: 0;
+    font-size: 300%;
+}
+
+#resource-display {
+    text-align: center;
+    float: left;
+    font-size: inherit;
+    margin: 0.4em 0;
+}

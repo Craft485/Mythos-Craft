@@ -1,0 +1,86 @@
+{
+    "cards": [
+        {
+            "name": "Zeus",
+            "health": 5,
+            "attack": 5,
+            "cost": 1,
+            "typings": {
+                "isMajorOlympian": true
+            }
+        },
+        {
+            "name": "Hades",
+            "health": 5,
+            "attack": 5,
+            "cost": 1,
+            "typings": {
+                "isMajorOlympian": true
+            }
+        },
+        {
+            "name": "Poseidon",
+            "health": 5,
+            "attack": 5,
+            "cost": 1,
+            "typings": {
+                "isMajorOlympian": true
+            }
+        },
+        {
+            "name": "Hestia",
+            "health": 5,
+            "attack": 5,
+            "cost": 1,
+            "typings": {
+                "isMajorOlympian": true
+            }
+        },
+        {
+            "name": "Athena",
+            "health": 5,
+            "attack": 5,
+            "cost": 1,
+            "typings": {
+                "isMajorOlympian": true
+            }
+        },
+        {
+            "name": "Areas",
+            "health": 5,
+            "attack": 5,
+            "cost": 1,
+            "typings": {
+                "isMajorOlympian": true
+            }
+        },
+        {
+            "name": "Artemis",
+            "health": 5,
+            "attack": 5,
+            "cost": 1,
+            "typings": {
+                "isMajorOlympian": true
+            }
+        },
+        {
+            "name": "Chaos",
+            "health": 10,
+            "attack": 10,
+            "cost": 1,
+            "typings": {
+                "isMajorOlympian": false,
+                "isPrimordial": true
+            }
+        },
+        {
+            "name": "Nectar",
+            "description": "Heal any god for 5 health",
+            "cost": 1,
+            "typings": {
+                "isItem": true
+            },
+            "requireMyOwnCardSelection": true
+        }
+    ]
+}
