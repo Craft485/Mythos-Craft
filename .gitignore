@@ -6,3 +6,5 @@ test
 out
 src/config.json
 public/bg 
+mysql
+local
