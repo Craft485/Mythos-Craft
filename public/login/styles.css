@@ -1,0 +1,23 @@
+body {
+	height: 100%;
+	width: 100%;
+	margin: 0;
+	background-color: grey;
+	color: white;
+}
+
+input {
+	background: none;
+	border: none;
+	/* Override outline for :focus-visible */
+	outline: none;
+	color: white;
+}
+
+input:hover {
+	cursor: pointer;
+}
+
+input::placeholder {
+	color: rgb(200, 200, 200);
+}

@@ -2,18 +2,91 @@ import * as express from 'express'
 const app = express()
 const http = require('http').createServer(app)
 const io = require('socket.io')(http)
+import * as bodyParser from 'body-parser'
+import * as config from './config.json'
 import * as morgan from 'morgan'
+import * as argon from 'argon2'
+import * as mysql from 'mysql'
 import * as path from 'path'
+
+const connection = mysql.createConnection({
+    host: config.mysql.host,
+    user: config.mysql.user,
+    password: config.mysql.password,
+    database: config.mysql.database,
+    multipleStatements: true
+})
+
 // @ts-ignore
 import { Game, _cardList as cardList } from './assets.js'
 import { Socket } from 'socket.io'
 
+const DEBUG_DECK: { [name: string]: number } = {}
+
+for (const entry in cardList) DEBUG_DECK[entry] = 2 
+const STRING_DEBUG_DECK = JSON.stringify(DEBUG_DECK)
+
 app.use(morgan(':remote-addr :method :url :status :response-time ms :res[content-length]'))
+app.use(bodyParser.urlencoded({ extended: false }))
 app.use(express.static('../public'))
 
 // 404 route handling
 app.get('*', (req: express.Request, res: express.Response) => {
     res.status(404).sendFile(path.resolve(__dirname, '../public/404.html'))
+})
+
+app.post('/login', async (req: express.Request, res: express.Response) => {
+    connection.query('SELECT * FROM users WHERE username = ?;', 
+    [req.body.username], 
+    (err, results) => {
+        if (err) { 
+            console.error(err)
+            return res.sendStatus(500)
+        }
+
+        if (results?.length > 0) {
+            // Verify password
+            argon.verify(results[0].password, req.body.password).then((success: boolean) => {
+                if (success) {
+                    // Render out a profile page or something
+                    res.send('logged in')
+                } else {
+                    res.send('incorrect username/password')
+                }
+            })
+        } else {
+            // failed to login
+            res.send('Unknown user')
+        }
+    })
+})
+
+app.post('/login/signup', (req: express.Request, res: express.Response) => {
+    connection.query('SELECT username FROM users WHERE username = ?;', [req.query.u], async (err, results) => {
+        if (err) { 
+            console.error(err)
+            return res.status(500).send({ status: 'Internal server error', success: false })
+        }
+
+        if (results?.length > 0) {
+            // username already in use
+            res.status(412).send({ status: 'user alerady exists', success: false })
+        } else {
+            // Add user to DB
+            connection.query(`INSERT INTO users (username, password) VALUES(?, ?); 
+            INSERT INTO inventory (cards) VALUES(?); 
+            INSERT INTO decks (userID, name, cards) VALUES(LAST_INSERT_ID(), ?, ?);`, 
+            // @ts-ignore Linter doesn't know what to expect of the query object
+            [req.query.u, await argon.hash(req.query.p, { hashLength: 50 }), STRING_DEBUG_DECK, 'Starter Deck', STRING_DEBUG_DECK], 
+            (err, results) => {
+                if (err) {
+                    console.error(`Error adding new user: ${err}`)
+                    return res.status(500).send({ status: 'Internal server error', success: false })
+                }
+                res.status(200).send({ status: 'logged in', success: true })
+            })
+        }
+    })
 })
 
 // Reference structures, not the full definition found in /assets
@@ -184,4 +257,4 @@ io.on('connection', (socket: Socket) => {
     })
 })
 
-http.listen(process.argv[2] || 8080, console.info(`Online!\n${Object.keys(cardList).length} cards loaded`))
+http.listen(process.argv[2] || config.PORT, console.info(`Online!\n${Object.keys(cardList).length} cards loaded`))

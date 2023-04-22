@@ -5,6 +5,6 @@ test
 *.txt
 out
 src/config.json
-public/bg 
-mysql
+public/bg
 local
+mysql

@@ -3,6 +3,7 @@
         "target": "ES2020",
         "module": "CommonJS",
         "moduleResolution": "nodenext",
+        "resolveJsonModule": true,
         "outDir": "../out",
         "removeComments": true,
         "declaration": true

@@ -4,10 +4,6 @@
         "outDir": "../../out/client",
         "removeComments": true,
         "declaration": true,
-        "moduleResolution": "nodenext",
-        "baseUrl": ".",
-        "paths": {
-            "assets": ["../../out/assets.d.ts"]
-        }
+        "moduleResolution": "nodenext"
     }
 }
