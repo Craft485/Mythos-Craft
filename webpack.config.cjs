@@ -8,7 +8,8 @@ module.exports = {
     },
     entry: {
         game: { import: path.resolve(__dirname, 'src/client/game.mts'), filename: 'game-main.js' },
-        login: { import: path.resolve(__dirname, 'src/client/login.mts') }
+        login: { import: path.resolve(__dirname, 'src/client/login.mts') },
+        profile: { import: path.resolve(__dirname, 'src/client/profile.mts') }
     },
     module: {
         rules: [

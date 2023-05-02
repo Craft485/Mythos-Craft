@@ -1,7 +1,8 @@
 {
     "client": {
         "game-main": "./public/g",
-        "login": "./public/login"
+        "login": "./public/login",
+        "profile": "./public/profile"
     },
     "json": [
         ["assets/Cards.json", ""],

@@ -2,13 +2,16 @@ import * as express from 'express'
 const app = express()
 const http = require('http').createServer(app)
 const io = require('socket.io')(http)
+import * as cookieParser from 'cookie-parser'
 import * as bodyParser from 'body-parser'
 import * as config from './config.json'
 import * as morgan from 'morgan'
 import * as argon from 'argon2'
 import * as mysql from 'mysql'
 import * as path from 'path'
+import * as uuid from 'uuid'
 
+// TODO: add heartbeat connection to db
 const connection = mysql.createConnection({
     host: config.mysql.host,
     user: config.mysql.user,
@@ -29,6 +32,7 @@ const STRING_DEBUG_DECK = JSON.stringify(DEBUG_DECK)
 app.use(morgan(':remote-addr :method :url :status :response-time ms :res[content-length]'))
 app.use(bodyParser.urlencoded({ extended: false }))
 app.use(express.static('../public'))
+app.use(cookieParser('pneumonoultramicroscopicsilicovolcanoconiosis'))
 
 // 404 route handling
 app.get('*', (req: express.Request, res: express.Response) => {
@@ -46,10 +50,16 @@ app.post('/login', async (req: express.Request, res: express.Response) => {
 
         if (results?.length > 0) {
             // Verify password
-            argon.verify(results[0].password, req.body.password).then((success: boolean) => {
+            argon.verify(results[0].password, req.body.password).then(async (success: boolean) => {
                 if (success) {
-                    // Render out a profile page or something
-                    res.send('logged in')
+                    const id = await uuid.v4()
+                    connection.query('UPDATE users SET uuid = ? WHERE username = ?;', [id, req.body.username], (err) => {
+                        if (err) {
+                            console.error(err)
+                            return res.sendStatus(500)
+                        }
+                        res.cookie('rememberme', id, { httpOnly: true, signed: true }).redirect('../profile')
+                    })
                 } else {
                     res.send('incorrect username/password')
                 }
@@ -78,14 +88,42 @@ app.post('/login/signup', (req: express.Request, res: express.Response) => {
             INSERT INTO decks (userID, name, cards) VALUES(LAST_INSERT_ID(), ?, ?);`, 
             // @ts-ignore Linter doesn't know what to expect of the query object
             [req.query.u, await argon.hash(req.query.p, { hashLength: 50 }), STRING_DEBUG_DECK, 'Starter Deck', STRING_DEBUG_DECK], 
-            (err, results) => {
+            async (err) => {
                 if (err) {
                     console.error(`Error adding new user: ${err}`)
                     return res.status(500).send({ status: 'Internal server error', success: false })
                 }
-                res.status(200).send({ status: 'logged in', success: true })
+                const id = await uuid.v4()
+                connection.query('UPDATE USERS SET uuid = ? WHERE username = ?;', [id, req.query.u], (err) => {
+                    if (err) {
+                        console.error(err)
+                        return res.status(500).send({ status: 'Internal server error', success: false })
+                    }
+                    res.cookie('rememberme', id, { httpOnly: true, signed: true }).redirect('../profile')
+                })
             })
         }
+    })
+})
+
+app.post('/profile/cardlist', (req: express.Request, res: express.Response) => {
+    // Query db based off uuid in signed cookies
+    if (!req.signedCookies.rememberme) return res.send({ status: 'User not logged in', state: 0, success: false })
+    connection.query('SELECT id, selectedDeck FROM users WHERE uuid = ?;', [req.signedCookies.rememberme], (err, userData) => {
+        if (err) {
+            console.error(err)
+            return res.status(500).send({ status: 'Internal server error', state: -1, success: false })
+        }
+
+        const { id, selectedDeck } = userData[0]
+        connection.query('SELECT cards FROM decks WHERE userID = ? AND name = ?;', [id, selectedDeck], (err, cardData) => {
+            if (err) {
+                console.error(err)
+                return res.status(500).send({ status: 'Internal server error', state: -1, success: false })
+            }
+
+            return res.send({ status: { cardList: cardList, inventory: JSON.parse(cardData[0].cards) }, state: 1, success: true })
+        })
     })
 })
 
