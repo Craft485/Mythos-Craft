@@ -109,23 +109,25 @@ app.post('/login/signup', (req: express.Request, res: express.Response) => {
 app.post('/profile/cardlist', (req: express.Request, res: express.Response) => {
     // Query db based off uuid in signed cookies
     if (!req.signedCookies.rememberme) return res.send({ status: 'User not logged in', state: 0, success: false })
-    connection.query('SELECT id, selectedDeck FROM users WHERE uuid = ?;', [req.signedCookies.rememberme], (err, userData) => {
+    connection.query('SELECT id, username, preferences, selectedDeck FROM users WHERE uuid = ?;', [req.signedCookies.rememberme], (err, userData) => {
         if (err) {
             console.error(err)
             return res.status(500).send({ status: 'Internal server error', state: -1, success: false })
         }
 
-        const { id, selectedDeck } = userData[0]
-        connection.query('SELECT cards FROM decks WHERE userID = ? AND name = ?;', [id, selectedDeck], (err, cardData) => {
+        const { id } = userData[0]
+        connection.query('SELECT cards, orichalcum FROM inventory WHERE id = ?; SELECT * FROM decks WHERE userID = ?;', [id, id], (err, data) => {
             if (err) {
                 console.error(err)
                 return res.status(500).send({ status: 'Internal server error', state: -1, success: false })
             }
 
-            return res.send({ status: { cardList: cardList, inventory: JSON.parse(cardData[0].cards) }, state: 1, success: true })
+            return res.send({ status: { cardList: cardList, inventory: JSON.parse(data[0][0].cards), orichalcum: data[0][0].orichalcum, deckData: data[1], userData: userData[0] }, state: 1, success: true })
         })
     })
 })
+
+app.post('/profile/signout', (req: express.Request, res: express.Response) => { if (req.signedCookies.rememberme) connection.query('UPDATE users SET uuid = null WHERE uuid = ?;', [req.signedCookies.rememberme], err => { if (err) { console.error(err) }; res.clearCookie('rememberme').sendStatus(200) }) })
 
 // Reference structures, not the full definition found in /assets
 // Going to try and only keep the props that we actively use here

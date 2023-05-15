@@ -19,10 +19,11 @@
                 <button id="setttings">Settings</button>
                 <button id="signout">Signout</button>
             </div>
-            <hr />
+            <hr/>
             <div id="user-statistics">
                 <span id="games-won">Games Won: <span id="games-won-display">0</span></span>
                 <span id="games-played">Games Played: <span id="games-played-display">0</span></span>
+                <span id="orichalcum">Orichalcum: <span id="orichalcum-display">0</span></span>
                 <span id="user-level">
                     <span id="progress" style="--progress: 50%;">
                         <span id="current-exp">0</span> / <span id="next-level-exp">0</span>
@@ -31,10 +32,17 @@
                 </span>
             </div>
         </div>
-        <hr />
-        <h4 id="inventory-label">Inventory:</h4>
-        <!-- <div id="card-display-filters"></div> -->
-        <div id="card-display"></div>
+        <hr/>
+        <div id="card-display-filters">
+            <input type="checkbox" name="cards" id="cards" checked/>
+            <label for="cards">Cards</label>
+            <input type="checkbox" name="decks" id="decks"/>
+            <label for="decks">Decks</label>
+        </div>
+        <div id="display-container">
+            <section id="card-display" name="cards"></section>
+            <section id="decks-display" name="decks"></section>
+        </div>
     </article>
 </body>
 </html>
