@@ -66,21 +66,15 @@ function generateHTML(cardData: Card, count: number): HTMLDivElement {
 }
 
 function cardPreview(cardName: string, count: number): HTMLElement {
-    // Probably redundant in practice, but remove any other card previews
+    // Remove any other card previews
     const old = document.getElementById('card-preview-overlay')
     if (old) old.remove()
 
-    // Somehow dymanically hide certain elements behind the overlay so its not distracting
-    // const oldDisplayValues: { [id: string]: string } = {}
-    // document.querySelectorAll('#deck-preview-overlay > [id*="deck-preview-overlay"]').forEach((element: HTMLElement) => {
-    //     oldDisplayValues[element.id] = element.style.display
-    //     element.style.display = 'none'
-    // })
+    // Dymanically hide certain elements behind the overlay so its not distracting
+    const oldDisplayValues: Array<Array<HTMLElement | string | null>> = []
+    // Yes this is a single line, no it is not readable, no I do not currently intend to change it
+    Array.from(document.querySelectorAll(`#${Array.from(document.getElementById('display-container').children)[Array.from(document.querySelectorAll('#card-display-filters > input')).findIndex((e: HTMLElement) => e.id === document.querySelector('#card-display-filters > input:checked').id)].id} > .card`)).forEach((e: HTMLElement) => { oldDisplayValues.push([ e, e.style.display || null ]); e.style.display = 'none'})
     
-    // document.querySelectorAll('deck-title-card').forEach((element: HTMLElement) => {
-    //     element.style.display = 'none'
-    // })
-
     const parent = document.createElement('div')
     parent.id = 'card-preview-overlay'
 
@@ -88,10 +82,7 @@ function cardPreview(cardName: string, count: number): HTMLElement {
     cancleBtn.id = 'cancel-card-preview-overlay'
     cancleBtn.innerText = 'X'
     cancleBtn.onclick = () => {
-        // for (const [id, value] of Object.entries(oldDisplayValues)) document.getElementById(id).style.display = value
-        // document.querySelectorAll('.card').forEach((element: HTMLElement) => {
-        //     element.removeAttribute('style')
-        // })
+        oldDisplayValues.forEach((entry: [HTMLElement, string | null]) => entry[1] ? entry[0].style.display = entry[1] : entry[0].removeAttribute('style'))
         parent.remove()
     }
     parent.appendChild(cancleBtn)
@@ -230,6 +221,9 @@ function pageSetup() {
     for (const label of labels) {
         label.addEventListener('click', ev => {
             ev.preventDefault()
+            // Remove all overlays on the page and reset any hidden child nodes
+            document.querySelectorAll('[id*="overlay"]').forEach((e: HTMLElement) => e.remove())
+            document.querySelectorAll('.card[style="display: none;"]').forEach((e: HTMLElement) => e.removeAttribute('style'))
             // I wanted to use just querySelector but it doesn't appear to work when using :checked for some reason
             Array.from(document.querySelectorAll<HTMLInputElement>('#card-display-filters > input[type="checkbox"]')).find((element: HTMLInputElement) => element.checked).checked = false
             document.querySelector<HTMLInputElement>(`#${label.htmlFor.toLowerCase()}`).checked = true
