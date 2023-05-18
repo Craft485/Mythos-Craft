@@ -297,4 +297,10 @@ io.on('connection', (socket: Socket) => {
     })
 })
 
+// Heartbeat connection to DB
+connection.query('SELECT 1;', err => { if (err) throw err; })
+setInterval(() => {
+    connection.query('SELECT 1;', err => { if (err) throw err })
+}, 300000)
+
 http.listen(process.argv[2] || config.PORT, console.info(`Online!\n${Object.keys(cardList).length} cards loaded`))
