@@ -46,6 +46,7 @@ interface ServerToClientEvents {
     attackResult: (res: attackResult, attackingCardCount: number, defendingCardCount: number) => void
     playerLeft: () => void
     gameOver: (data: { w: Player, l: Player }) => void
+    redirect: (endpoint: string) => void
 }
 
 interface ClientToServerEvents {
@@ -334,7 +335,7 @@ socket.on('newCard', (card, itemCheck) => {
 })
 
 socket.on('attackResult', (res, attackingCardCount, defendingCardCount) => {
-    // Ensure consistent formatting, may be redundant
+    // Ensure consistent formatting
     if (!res.attackingCard.name.includes('_')) res.attackingCard.name += `_${attackingCardCount}`
     if (!res.defendingCard.name.includes('_')) res.defendingCard.name += `_${defendingCardCount}`
     // Reset game state
@@ -419,6 +420,8 @@ socket.on('gameOver', data => {
     console.info(`Winner: ${data.w.id}\nLoser: ${data.l.id}`)
 
 })
+
+socket.on('redirect', endpoint => window.location.pathname = endpoint)
 
 const btn = document.getElementById('submit')
 

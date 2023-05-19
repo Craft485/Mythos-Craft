@@ -4,6 +4,7 @@ const http = require('http').createServer(app)
 const io = require('socket.io')(http)
 import * as cookieParser from 'cookie-parser'
 import * as bodyParser from 'body-parser'
+import * as charmap from './charmap.json'
 import * as config from './config.json'
 import * as morgan from 'morgan'
 import * as argon from 'argon2'
@@ -11,7 +12,6 @@ import * as mysql from 'mysql'
 import * as path from 'path'
 import * as uuid from 'uuid'
 
-// TODO: add heartbeat connection to db
 const connection = mysql.createConnection({
     host: config.mysql.host,
     user: config.mysql.user,
@@ -32,7 +32,7 @@ const STRING_DEBUG_DECK = JSON.stringify(DEBUG_DECK)
 app.use(morgan(':remote-addr :method :url :status :response-time ms :res[content-length]'))
 app.use(bodyParser.urlencoded({ extended: false }))
 app.use(express.static('../public'))
-app.use(cookieParser('pneumonoultramicroscopicsilicovolcanoconiosis'))
+app.use(cookieParser(config.cookie_secret))
 
 // 404 route handling
 app.get('*', (req: express.Request, res: express.Response) => {
@@ -94,7 +94,7 @@ app.post('/login/signup', (req: express.Request, res: express.Response) => {
                     return res.status(500).send({ status: 'Internal server error', success: false })
                 }
                 const id = await uuid.v4()
-                connection.query('UPDATE USERS SET uuid = ? WHERE username = ?;', [id, req.query.u], (err) => {
+                connection.query('UPDATE users SET uuid = ? WHERE username = ?;', [id, req.query.u], (err) => {
                     if (err) {
                         console.error(err)
                         return res.status(500).send({ status: 'Internal server error', success: false })
@@ -107,6 +107,7 @@ app.post('/login/signup', (req: express.Request, res: express.Response) => {
 })
 
 app.post('/profile/cardlist', (req: express.Request, res: express.Response) => {
+    console.log(req.signedCookies)
     // Query db based off uuid in signed cookies
     if (!req.signedCookies.rememberme) return res.send({ status: 'User not logged in', state: 0, success: false })
     connection.query('SELECT id, username, preferences, selectedDeck FROM users WHERE uuid = ?;', [req.signedCookies.rememberme], (err, userData) => {
@@ -141,6 +142,7 @@ interface Card {
 
 interface Player {
     id: string
+    socketID: string
     energy: number
     health: number
     [key: string]: any
@@ -148,8 +150,13 @@ interface Player {
 
 interface Game {
     players: Array<Player>
-    join(id: string): void
+    join(socketID: string, id: string, cardData: string): void
     [key: string]: any
+}
+
+function decode(s: string): string {
+    for (const [value, code] of Object.entries(charmap)) s = s.replaceAll(code, value)
+    return s
 }
 
 const games: Array<Game> = []
@@ -158,42 +165,77 @@ let isGameWaitingForPlayers: boolean = false
 
 io.on('connection', (socket: Socket) => {
     console.info(`Socket Connected: ${socket.id}`)
-
+    let globalPlayerID: string | number
     socket.on('join', () => {
-        // At some point we will need user data such as some sort of session cookie to determine whose playing
-        if (isGameWaitingForPlayers) {
-            games[games.length - 1].join(socket.id)
-            isGameWaitingForPlayers = false
+        // Verify user
+        const originalCookie = decode(`${socket.handshake.headers.cookie}`.split('; ').find(e => e.toLowerCase().startsWith('rememberme')).replace('rememberme=', '')) || null
+        const validCookie = originalCookie ? cookieParser.signedCookie(originalCookie, config.cookie_secret) : null
+        // Check cookie and uuid, should this be moved to on join listener?
+        const validUUID = uuid.validate(validCookie)
+        const validUUIDVersion = uuid.version(validCookie) === 4
+        if (validCookie && validCookie !== originalCookie && validUUID && validUUIDVersion) {
+            // Valid session and uuid
+            connection.query('SELECT id, selectedDeck FROM users WHERE uuid = ?;', [validCookie], (err, userData) => {
+                if (err) {
+                    console.error(err)
+                    socket.emit('err', 'DB: Server Error')
+                    return
+                }
+                console.log(userData)
+                const { id, selectedDeck } = userData[0]
+                globalPlayerID = id
+                connection.query('SELECT cards FROM decks WHERE userID = ? AND name = ?;', [id, selectedDeck], (err, deckData) => {
+                    if (err) {
+                        console.error(err)
+                        socket.emit('err', 'DB: Server Error')
+                        return
+                    }
+
+                    console.log(deckData)
+                    const { cards } = deckData[0]
+                    console.log(cards)
+                    // At some point we will need user data such as some sort of session cookie to determine whose playing
+                    if (isGameWaitingForPlayers) {
+                        games[games.length - 1].join(socket.id, id, cards)
+                        isGameWaitingForPlayers = false
+                    } else {
+                        // Create and join a new game instance
+                        const newGame = new Game()
+                        games.push(newGame)
+                        games[games.length - 1].join(socket.id, id, cards)
+                        isGameWaitingForPlayers = true
+                    }
+                    players[socket.id] = games[games.length - 1]
+                    // Same to compare global user ids here because it is not possible for them to be 0
+                    const firstTurn: boolean = players[socket.id].players[0].id === id
+                    socket.emit('confirm', 'Joined game', firstTurn)
+                    // If isGameWaitingForPlayers is false that means that at the beginning of this event it was true meaning the game is now ready to start
+                    if (!isGameWaitingForPlayers) {
+                        socket.emit('start', players[socket.id].players.find(p => p.id === id))
+                        // Let opponent know the game has started
+                        io.sockets.sockets.get(players[socket.id].players.find(p => p.id !== id).socketID).emit('start', players[socket.id].players.find(p => p.id !== id))
+                    }
+                })
+            })
         } else {
-            // Create and join a new game instance
-            const newGame = new Game()
-            games.push(newGame)
-            games[games.length - 1].join(socket.id)
-            isGameWaitingForPlayers = true
-        }
-        players[socket.id] = games[games.length - 1]
-        const firstTurn: boolean = players[socket.id].players[0].id === socket.id
-        socket.emit('confirm', 'Joined game', firstTurn)
-        // If isGameWaitingForPlayers is false that means that at the beginning of this event it was true meaning the game is now ready to start
-        if (!isGameWaitingForPlayers) {
-            socket.emit('start', players[socket.id].players.find(p => p.id === socket.id))
-            // Let opponent know the game has started
-            io.sockets.sockets.get(players[socket.id].players.find(p => p.id !== socket.id).id).emit('start', players[socket.id].players.find(p => p.id !== socket.id))
+            // Invalid session or user
+            socket.emit('redirect', 'login')
+            return
         }
     })
 
     socket.on('draw', async (data: { isGenStartup: boolean | null, count?: number } | null) => {
         console.warn('Draw call')
         const game = players[socket.id]
-        const newCard = await game.drawCard(socket.id)
+        const newCard = await game.drawCard(globalPlayerID)
         if (/*newCard instanceof Error || */newCard === null) {
             socket.emit('err', `An error occured | ACTION: Draw Card\nSocket: ${socket.id}`)
         } else {
             const itemCheck = newCard.typings?.isItem ? `${newCard.checkForCanBePlayed}` : null
             socket.emit('newCard', newCard, itemCheck)
             // This logic is redundant, fix later
-            const opponent = game.players.find(p => p.id !== socket.id)
-            if (!data?.isGenStartup) io.sockets.sockets.get(opponent.id).emit('opponentDraw')
+            const opponent = game.players.find(p => p.id !== globalPlayerID)
+            if (!data?.isGenStartup) io.sockets.sockets.get(opponent.socketID).emit('opponentDraw')
         }
     })
 
@@ -201,7 +243,7 @@ io.on('connection', (socket: Socket) => {
         // Check that the card trying to be played is an actual card, is the players turn, and the player has enough energy to play it
         let legal = true
         const game = players[socket.id]
-        const player = game.players.find(p => p.id === socket.id)
+        const player = game.players.find(p => p.id === globalPlayerID)
         const isValidCard = cardList[Object.keys(cardList).find((cardObjectName: string) => cardList[cardObjectName].name.toLowerCase() === data.cName.toLowerCase())]
 
         if (!isValidCard || player.energy < isValidCard.cost) legal = false
@@ -212,10 +254,10 @@ io.on('connection', (socket: Socket) => {
     socket.on('play', async (data: { cName: string, attackingCard: Card | null, defendingCard: Card | null }) => {
         const validCard: any = Object.values(cardList).find((card: { name: string }) => card.name.toLowerCase() === data.cName.toLowerCase())
         const game = players[socket.id]
-        const player = game.players.find(p => p.id === socket.id)
+        const player = game.players.find(p => p.id === globalPlayerID)
         // If we have a valid card object, game object, and its the players turn
         if (validCard && game && player.isTakingTurn) {
-            const playResult = game.playCard(validCard, socket.id)
+            const playResult = game.playCard(validCard, globalPlayerID)
             if (!playResult) return socket.emit('err', 'Failed to play, insufficient resources')
             // If an item is played we need to inform both players of its result
             const itemRes = validCard.typings?.isItem
@@ -234,7 +276,7 @@ io.on('connection', (socket: Socket) => {
             socket.emit('updateResourceEngine', player)
             // Tell opponent that a card was played
             const opponent = game.players.find(p => !p.isTakingTurn)
-            io.sockets.sockets.get(opponent.id).emit('opponentPlay', { card: validCard, itemRes: itemRes })
+            io.sockets.sockets.get(opponent.socketID).emit('opponentPlay', { card: validCard, itemRes: itemRes })
         } else {
             return socket.emit('err', 'Invalid play condition')
         }
@@ -244,19 +286,21 @@ io.on('connection', (socket: Socket) => {
         console.warn('turn-end event')
         const game = players[socket.id]
         game.endTurn(startingHandGenerated)
-        const defender = game.players.find(player => player.id !== socket.id)
-        io.sockets.sockets.get(defender.id).emit('turn-ended')
+        const defender = game.players.find(player => player.id !== globalPlayerID)
+        io.sockets.sockets.get(defender.socketID).emit('turn-ended')
         // Updating the player energy in the game state is in Game#endTurn(), this is to tell the clients to update their own game state and ui
         if (startingHandGenerated) {
-            socket.emit('updateResourceEngine', game.players.find(p => p.id === socket.id))
-            io.sockets.sockets.get(defender.id).emit('updateResourceEngine', defender)
+            socket.emit('updateResourceEngine', game.players.find(p => p.id === globalPlayerID))
+            io.sockets.sockets.get(defender.socketID).emit('updateResourceEngine', defender)
         }
     })
 
     socket.on('attack', async (data: { attackingCard?: Card, defendingCard?: Card, attackingCardCount?: number, defendingCardCount?: number }) => {
+        console.log(data)
+        console.log(data.attackingCard)
         const game = players[socket.id]
-        const attacker = game.players.find(p => p.id === socket.id)
-        const defender = game.players.find(p => p.id !== socket.id)
+        const attacker = game.players.find(p => p.id === globalPlayerID)
+        const defender = game.players.find(p => p.id !== globalPlayerID)
         const cardAction = cardList[Object.keys(cardList).find((name: string) => name.toUpperCase() === data.attackingCard?.name.toUpperCase() )].action
 
         if (attacker.isTakingTurn && data.defendingCard?.attack && data.defendingCard?.health) {
@@ -269,11 +313,11 @@ io.on('connection', (socket: Socket) => {
             }
             // Send result back to client and opponent
             socket.emit('attackResult', res, data.attackingCardCount, data.defendingCardCount)
-            io.sockets.sockets.get(defender.id).emit('attackResult', res, data.attackingCardCount, data.defendingCardCount)
+            io.sockets.sockets.get(defender.socketID).emit('attackResult', res, data.attackingCardCount, data.defendingCardCount)
             const gameOver = game.checkGameOver()
             if (gameOver) {
                 socket.emit('gameOver', gameOver)
-                io.sockets.sockets.get(defender.id).emit('gameOver', gameOver)
+                io.sockets.sockets.get(defender.socketID).emit('gameOver', gameOver)
             }
         } else {
             socket.emit('err', 'One or more conditions failed for attack event')
@@ -284,13 +328,13 @@ io.on('connection', (socket: Socket) => {
         console.info(`Socket Disconnected: ${socket.id}`)
         // Clear any player data from the game instance, then alert the remaining player, if there is one, that the game has ended
         try {
-            io.sockets.sockets.get(players[socket.id].players.find(p => p.id !== socket.id).id).emit('playerLeft')
+            io.sockets.sockets.get(players[socket.id].players.find(p => p.id !== globalPlayerID).socketID).emit('playerLeft')
         } catch (error) {/* Theres no need to do anything with the error */}
         delete players[socket.id]
-        const index = games.findIndex(game => game.players.find(player => player.id === socket.id))
+        const index = games.findIndex(game => game.players.find(player => player.id === globalPlayerID))
         // If index exists, then the game object exists in the games array
         if (index >= 0) {
-            const playerIndex = games[index].players.findIndex(player => player.id === socket.id)
+            const playerIndex = games[index].players.findIndex(player => player.id === globalPlayerID)
             games[index].players.splice(playerIndex, 1)
             games.splice(index, 1)
         }

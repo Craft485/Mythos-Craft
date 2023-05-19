@@ -10,17 +10,18 @@ class Game {
         this.turnCount = 1
     }
 
-    join(id: string): void {
+    join(socketID: string, globalID: string, cardData: string): void {
         if (this.players.length < 3) {
-            const f = this.players.length === 0 ? true : false
-            // Multiple test decks are needed because Objects are reference types, meaning 2 games at the same time won't work currently.
-            // This should be fixed once I do db stuff
-            const p = new Player({ id: id, deck: f ? _tDeck1 : _tDeck2, isTakingTurn: f, health: 30})
+            const cards = JSON.parse(cardData)
+            console.log(cards)
+            const deckMap = new Map
+            for (const [name, count] of Object.entries(cards)) deckMap.set(name, [{ ..._cardList[name] }, count])
+            const p = new Player({ id: globalID, socketID: socketID, deck: new Deck({ deckMap: deckMap }), isTakingTurn: this.players.length === 0 ? true : false, health: 30})
             // Set initial energy count, energy is based on what turn it is
             p.energy = this.turnCount
             this.players.push(p)
             // Init players field object
-            this.playingField[id] = {id: id, cards: {}}
+            this.playingField[globalID] = {id: globalID, cards: {}}
         }
     }
 
