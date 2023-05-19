@@ -26,7 +26,6 @@ function _action(attackingCardData: Card, defendingCardData: Card, game: Game, a
 
 function Zeus_Action(attackingCardData: Card, defendingCardData: Card, game: Game, attackingCardCount: number, defendingCardCount: number): actionRes | Error {
     defendingCardData.health -= attackingCardData.attack
-    defendingCardData.props.health -= attackingCardData.props.attack
     // Deal excess damage to player
     if (defendingCardData.health < 0) var defendingPlayer = cardDeath(defendingCardData, game, defendingCardCount)
     return new actionRes({ attackingCard: attackingCardData, defendingCard: defendingCardData, defendingPlayer: defendingPlayer })
@@ -34,7 +33,6 @@ function Zeus_Action(attackingCardData: Card, defendingCardData: Card, game: Gam
 
 function Nectar_Action(selectedFriendlyCard: Card, selectedOpponentCard: Card, game: Game, attackingCardCount: number, defendingCardCount: number): actionRes | Error {
     selectedFriendlyCard.health = selectedFriendlyCard.health + 5 >= selectedFriendlyCard.maxHealth ? selectedFriendlyCard.maxHealth : selectedFriendlyCard.health + 5
-    selectedFriendlyCard.props.health = selectedFriendlyCard.health
     return new actionRes({ attackingCard: selectedFriendlyCard })
 }
 
