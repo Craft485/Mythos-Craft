@@ -10,6 +10,25 @@
     <script src="./profile.js" defer></script>
 </head>
 <body>
+    <div id="context-menu">
+        <ul id="context-menu-list">
+            <li class="context-menu-item" id="context-menu-inspect-item">
+                <p class="context-menu-title">Inspect</p>
+            </li>
+            <li class="context-menu-item has-sub-menu">
+                <p class="context-menu-title">Add To Deck</p>
+                <ul class="sub-menu" id="add-to-deck-sub-menu">
+                    <!-- Populated on page load -->
+                </ul>
+            </li>
+            <li class="context-menu-item has-sub-menu">
+                <p class="context-menu-title">Remove From Deck</p>
+                <ul class="sub-menu" id="remove-from-deck-sub-menu">
+                    <!-- Populated on page load -->
+                </ul>
+            </li>
+        </ul>
+    </div>
     <article id="content-container">
         <div id="user-info">
             <div id="header">

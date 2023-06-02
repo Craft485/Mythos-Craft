@@ -11,9 +11,9 @@ interface Card {
     }
 }
 
-interface populateResponseObject {
+interface fetchResponseObject {
     success: boolean
-    state: -1 | 0 | 1
+    state: number
     status: {
         cardList: {
             [cardName: string]: Card
@@ -39,6 +39,8 @@ interface populateResponseObject {
 
 const cardDisplay = document.getElementById('card-display')
 const deckDisplay = document.getElementById('decks-display')
+const contentMenu = document.getElementById('context-menu')
+let contextMenuFocusElement: HTMLElement | null = null
 
 const decks: { [name: string]: { id: number, cards: { [name: string]: number } } } = {}
 let cardData: { [name: string]: Card } = null
@@ -133,7 +135,7 @@ function cardPreview(cardName: string, count: number): HTMLElement {
 
 async function populate() {
     const res = await fetch('cardlist', { method: "POST" })
-    res.json().then((data: populateResponseObject) => {
+    res.json().then((data: fetchResponseObject) => {
         console.log(data)
         if (data.success) {
             cardData = data.status.cardList
@@ -142,6 +144,16 @@ async function populate() {
             document.getElementById('orichalcum-display').innerText = `${data.status.orichalcum}` || '0'
             for (const prop in data.status.inventory) {
                 const cardElement = generateHTML(data.status.cardList[prop], data.status.inventory[prop])
+                cardElement.addEventListener('contextmenu', (e: MouseEvent) => {
+                    e.preventDefault()
+                    // Show and position custom context menu
+                    contentMenu.style.display = 'initial'
+                    contentMenu.style.left = `${e.clientX}px`
+                    contentMenu.style.top = `${e.clientY}px`
+                    contextMenuFocusElement = cardElement
+                    // Clear any active sub menus
+                    Array.from(document.querySelectorAll('.sub-menu-active')).forEach(e => e.classList.remove('sub-menu-active'))
+                })
                 cardElement.onclick = () => {
                     cardDisplay.appendChild(cardPreview(prop, data.status.inventory[prop]))
                 }
@@ -149,9 +161,94 @@ async function populate() {
             }
             for (const deck of data.status.deckData) {
                 const cards: { [name: string]: number } = JSON.parse(deck.cards)
-                const sumOfCardsInDeck = Object.values(cards).reduce((pre: number, cur: number) => pre + cur, 0)
-
                 decks[deck.name] = { id: deck.deckID, cards: cards }
+                const sumOfCardsInDeck = () => { return Object.values(decks[deck.name].cards).reduce((pre: number, cur: number) => pre + cur, 0) }
+
+                // Add deck to context menu
+                const addMenu = document.getElementById('add-to-deck-sub-menu')
+                const removeMenu = document.getElementById('remove-from-deck-sub-menu')
+                const addMenuItem = document.createElement('p')
+                const removeMenuItem = document.createElement('p')
+                addMenuItem.innerText = deck.name
+                addMenuItem.className = 'sub-menu-item add-to-deck-sub-menu-item'
+                removeMenuItem.innerText = deck.name
+                removeMenuItem.className = 'sub-menu-item add-to-deck-sub-menu-item'
+                addMenuItem.onclick = async () => {
+                    // Update UI based on server response
+                    // @ts-ignore firstElementChild is an Element instead of HTMLElement
+                    const cardName = contextMenuFocusElement.firstElementChild.innerText
+                    const res = await fetch(`addCardToDeck?cardName=${cardName}&deckName=${deck.name}`, { method: 'POST' })
+                    res.json().then((data: fetchResponseObject) => {
+                        if (data.success) {
+                            // If not present in deck object, add it
+                            !decks[deck.name].cards[cardName] ? decks[deck.name].cards[cardName] = 1 : decks[deck.name].cards[cardName]++
+                            // Update deck preview ui
+                            const deckTitleCard = Array.from(deckDisplay.children).find((e: HTMLElement) => e.innerText.includes(deck.name))
+                            deckTitleCard.querySelector<HTMLElement>('.card-count-display').innerText = `x${sumOfCardsInDeck()}`
+                            if (document.getElementById('deck-preview-overlay-display')) Array.from(document.getElementById('deck-preview-overlay-display').children).find((e: HTMLElement) => e.innerText.includes(cardName)).querySelector<HTMLElement>('.card-count-display').innerText = `x${decks[deck.name].cards[cardName]}`
+                        } else {
+                            switch (data.state) {
+                                case 0:
+                                    // User not logged in
+                                    window.location.pathname = '/'
+                                    break;
+                                case -1:
+                                    // 5xx
+                                    console.error(`Encountered 5XX: ${data.status}`)
+                                    break;
+                                case -2:
+                                    // 4xx
+                                    console.warn('Encountered 4XX, aborted request')
+                                    break;
+                                default:
+                                    console.error('Unknown response received from server')
+                                    break;
+                            }
+                        }
+                    })
+                }
+                removeMenuItem.onclick = async () => {
+                    // @ts-ignore firstElementChild is an Element instead of HTMLElement
+                    const cardName = contextMenuFocusElement.firstElementChild.innerText
+                    const res = await fetch(`removeCardFromDeck?cardName=${cardName}&deckName=${deck.name}`, { method: 'POST' })
+                    res.json().then((data: fetchResponseObject) => {
+                        if (data.success) {
+                            decks[deck.name].cards[cardName]--
+                            // Update deck preview ui
+                            const deckTitleCard = Array.from(deckDisplay.children).find((e: HTMLElement) => e.innerText.includes(deck.name))
+                            deckTitleCard.querySelector<HTMLElement>('.card-count-display').innerText = `x${sumOfCardsInDeck()}`
+                            if (document.getElementById('deck-preview-overlay-display')) {
+                                const cardDisplayNode = Array.from(document.getElementById('deck-preview-overlay-display').children).find((e: HTMLElement) => e.innerText.includes(cardName)) || null
+                                cardDisplayNode.querySelector<HTMLElement>('.card-count-display').innerText = `x${decks[deck.name].cards[cardName]}`
+                                // If card count is 0, remove if from the preview if the preview is up and remove it from the deck object
+                                if (decks[deck.name].cards[cardName] <= 0) {
+                                    delete decks[deck.name].cards[cardName]
+                                    if (cardDisplayNode) cardDisplayNode.remove()
+                                }
+                            }
+                        } else {
+                            switch (data.state) {
+                                case 0:
+                                    // User not logged in
+                                    window.location.pathname = '/'
+                                    break;
+                                case -1:
+                                    // 5xx
+                                    console.error(`Encountered 5XX: ${data.status}`)
+                                    break;
+                                case -2:
+                                    // 4xx
+                                    console.warn('Encountered 4XX, aborted request')
+                                    break;
+                                default:
+                                    console.error('Unknown response received from server')
+                                    break;
+                            }
+                        }
+                    })
+                }
+                addMenu.appendChild(addMenuItem)
+                removeMenu.appendChild(removeMenuItem)
 
                 // This is pretty much a slimmed down version of generateHTML()
                 const parent = document.createElement('div')
@@ -162,7 +259,7 @@ async function populate() {
 
                 const cardCountDisplay = document.createElement('div')
                 cardCountDisplay.className = 'card-count-display'
-                cardCountDisplay.innerText = `x${sumOfCardsInDeck}`
+                cardCountDisplay.innerText = `x${sumOfCardsInDeck()}`
 
                 parent.appendChild(title)
                 parent.appendChild(cardCountDisplay)            
@@ -188,6 +285,16 @@ async function populate() {
                     // Add cards to overlay
                     for (const [cardName, count] of Object.entries(decks[deck.name].cards)) {
                         const cardElement = generateHTML(cardData[cardName], count)
+                        cardElement.addEventListener('contextmenu', e => {
+                            e.preventDefault()
+                            // Show and position custom context menu
+                            contentMenu.style.display = 'initial'
+                            contentMenu.style.left = `${e.clientX}px`
+                            contentMenu.style.top = `${e.clientY}px`
+                            contextMenuFocusElement = cardElement
+                            // Clear any active sub menus
+                            Array.from(document.querySelectorAll('.sub-menu-active')).forEach(e => e.classList.remove('sub-menu-active'))
+                        })
 
                         cardElement.onclick = () => {
                             overlay.appendChild(cardPreview(cardName, count))
@@ -232,6 +339,24 @@ function pageSetup() {
         })
     }
     document.querySelector<HTMLElement>(`#display-container > :first-child`).style.display = 'flex'
+    document.body.parentElement.onclick = (e: PointerEvent) => { 
+        // @ts-ignore Intellisense thinks that PointerEvent#target isn't an HTMLElement?
+        if (!e.target.className.includes('context-menu') && !e.target.id.includes('context-menu') && !e.target.className.includes('sub-menu')) {
+            contentMenu.style.display = 'none'
+            Array.from(document.querySelectorAll('.sub-menu-active')).forEach(element => element.classList.remove('sub-menu-active'))
+            contextMenuFocusElement = null
+        }
+    }
+    Array.from(document.querySelectorAll('.has-sub-menu > p')).forEach((element: HTMLElement) => element.onclick = () => {
+        const subMenuActiveOnThisElement = element.parentElement.classList.contains('sub-menu-active')
+        if (subMenuActiveOnThisElement) {
+            element.parentElement.classList.remove('sub-menu-active')
+        } else {
+            document.querySelector('.sub-menu-active')?.classList.remove('sub-menu-active')
+            element.parentElement.classList.add('sub-menu-active')
+        }
+    })
+    document.getElementById('context-menu-inspect-item').onclick = () => contextMenuFocusElement?.click()
 }
 
 document.getElementById('signout').onclick = () => fetch('signout', { method: "POST" }).then(() => window.location.pathname = '/')

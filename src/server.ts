@@ -128,6 +128,86 @@ app.post('/profile/cardlist', (req: express.Request, res: express.Response) => {
     })
 })
 
+app.post('/profile/addCardToDeck', (req, res) => {
+    // Check for valid request
+    if (!req.signedCookies.rememberme) return res.status(400).send({ status: 'User not logged in', state: 0,  success: false })
+
+    const { cardName, deckName } = req.query
+    connection.query('SELECT id FROM users WHERE uuid = ?;', [req.signedCookies.rememberme], (err, userData) => {
+        if (err) {
+            console.error(err)
+            return res.status(500).send({ status: 'Internal server error', state: -1, success: false })
+        }
+        const { id } = userData[0]
+        connection.query('SELECT * FROM inventory WHERE id = ?; SELECT * FROM decks WHERE userID = ? AND name = ?;', [id, id, deckName], (err, data) => {
+            if (err) {
+                console.error(err)
+                return res.status(500).send({ status: 'Internal server error', state: -1, success: false })
+            }
+            const cards = JSON.parse(data[0][0].cards)
+            const deckData = JSON.parse(data[1][0].cards) || null
+            const validCardNameInInventory = Object.keys(cards).find(name => name === cardName)
+            if (validCardNameInInventory) {
+                if (!deckData) return res.status(400).send({ status: 'Invalid deck name', state: -2, success: false })
+                // Check that the user is able to add the card(they have enough remaining in their inventory)
+                const cardCountInDeck = deckData[validCardNameInInventory] || 0
+                const cardCountInInventory = cards[validCardNameInInventory]
+                
+                if (cardCountInInventory > cardCountInDeck) {
+                    cardCountInDeck > 0 ? deckData[validCardNameInInventory]++ : deckData[validCardNameInInventory] = 1
+                    connection.query('UPDATE decks SET cards = ? WHERE userID = ? AND name = ?;', [JSON.stringify(deckData), id, deckName], err => {
+                        if (err) {
+                            console.error(err)
+                            return res.status(500).send({ status: 'Internal server error', state: -1, success: false })
+                        } else {
+                            return res.status(200).send({ status: 'Success', state: 1, success: true })
+                        }
+                    })
+                } else {
+                    return res.status(400).send({ status: 'Not enough cards', state: -2, success: false })
+                }
+            } else {
+                return res.status(400).send({ status: 'Unknown card name', state: -2, success: false })
+            }
+        })
+    })
+})
+
+app.post('/profile/removeCardFromDeck', (req, res) => {
+    if (!req.signedCookies.rememberme) return res.status(400).send({ status: 'User not logged in', state: 0,  success: false })
+
+    const { cardName, deckName } = req.query
+    connection.query('SELECT id FROM users WHERE uuid = ?;', [req.signedCookies.rememberme], (err, userData) => {
+        if (err) {
+            console.error(err)
+            return res.status(500).send({ status: 'Internal server error', state: -1, success: false })
+        }
+        const { id } = userData[0]
+        connection.query('SELECT * FROM decks WHERE userID = ? AND name = ?;', [id, deckName], (err, deckData) => {
+            if (err) {
+                console.error(err)
+                return res.status(500).send({ status: 'Internal server error', state: -1, success: false })
+            }
+            const cards = JSON.parse(deckData[0].cards) || null
+            const validCardName = Object.keys(cards).find(name => name === cardName)
+            if (validCardName && cards) {
+                // If we are removing the last card then remove the entry for the card in the deck object
+                cards[validCardName] > 1 ? cards[validCardName]-- : delete cards[validCardName]
+                connection.query('UPDATE decks SET cards = ? WHERE userID = ? AND name = ?;', [JSON.stringify(cards), id, deckName], err => {
+                    if (err) {
+                        console.error(err)
+                        return res.status(500).send({ status: 'Internal server error', state: -1, success: false })
+                    } else {
+                        return res.status(200).send({ status: 'Success', state: 1, success: true })
+                    }
+                })
+            } else {
+                return res.status(400).send({ status: 'Invalid card/deck name', state: -2, success: false })
+            }
+        })
+    })
+})
+
 app.post('/profile/signout', (req: express.Request, res: express.Response) => { if (req.signedCookies.rememberme) connection.query('UPDATE users SET uuid = null WHERE uuid = ?;', [req.signedCookies.rememberme], err => { if (err) { console.error(err) }; res.clearCookie('rememberme').sendStatus(200) }) })
 
 // Reference structures, not the full definition found in /assets

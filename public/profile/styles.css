@@ -16,6 +16,63 @@ article {
     margin: 0.5%;
 }
 
+#context-menu {
+    display: none;
+    position: absolute;
+    top: 0px;
+    left: 0px;
+    z-index: 99999;
+    background-color: rgb(42, 42, 42);
+    border: solid thin rgb(0, 0, 0);
+    padding: 0.1%;
+    border-radius: 10%;
+    width: 8%;
+    user-select: none;
+}
+
+#context-menu-list {
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    margin: 2.5%;
+}
+
+.context-menu-item {
+    list-style: none;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.context-menu-item:hover {
+    text-decoration: underline;
+}
+
+.has-sub-menu > p::after {
+    content: '>';
+    padding-left: 5%;
+}
+
+.sub-menu-active > p::after {
+    content: '^';
+}
+
+.sub-menu {
+    display: none;
+    padding: 0;
+    position: absolute;
+    left: 110%;
+    top: 50%;
+    background-color: rgb(42, 42, 42);
+    border: solid thin rgb(0, 0, 0);
+    padding: 0 10%;
+    border-radius: 10%;
+}
+
+.sub-menu-active .sub-menu {
+    display: flex;
+    flex-direction: column;
+}
+
 #header {
     display: flex;
     font-size: x-large;
@@ -185,6 +242,7 @@ article {
     width: 10%;
     margin: 0.5%;
     text-align: center;
+    user-select: none;
 }
 
 .card:hover {
