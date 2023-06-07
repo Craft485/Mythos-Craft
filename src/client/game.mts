@@ -13,6 +13,7 @@ interface Player {
     id: string
     energy: number
     health: number
+    name: string
 }
 
 interface itemActionResult {
@@ -45,7 +46,7 @@ interface ServerToClientEvents {
     updateResourceEngine: (player: Player) => void
     attackResult: (res: attackResult, attackingCardCount: number, defendingCardCount: number) => void
     playerLeft: () => void
-    gameOver: (data: { w: Player, l: Player }) => void
+    gameOver: (data: { w: { player: Player, exp: number }, l: { player: Player, exp: number } } | null, playerLeveledUp: boolean) => void
     redirect: (endpoint: string) => void
 }
 
@@ -259,6 +260,8 @@ socket.on('start', player => {
     Game.opponentsHealth = player.health
     // Forcing conversion to string
     document.getElementById('resource-display-count').innerText = `${Game.energy}`
+    document.querySelector<HTMLElement>(`#${_myHand.id} .health-display`).innerText = `${player.health}`
+    document.querySelector<HTMLElement>(`#${_opHand.id} .health-display`).innerText = `${player.health}`
 })
 
 socket.on('updateResourceEngine', player => {
@@ -407,18 +410,18 @@ socket.on('playerLeft', () => {
     socket.close()
 })
 
-socket.on('gameOver', data => {
+socket.on('gameOver', (data, playerLeveledUp) => {
+    console.log(data)
     // Create an overlay to block the player from interacting with the playing feild
     const overlay = document.createElement('div')
     overlay.className = 'game-end-overlay'
     const content = document.createElement('div')
     content.id = 'overlay-content'
-    content.innerText = `Winner:\n${data.w.id}\n\nLoser:\n${data.l.id}`
+    content.innerText = `Winner:\n${data.w.player.name}\n\nLoser:\n${data.l.player.name}`
     overlay.appendChild(content)
     document.body.appendChild(overlay)
     socket.close()
-    console.info(`Winner: ${data.w.id}\nLoser: ${data.l.id}`)
-
+    console.info(`Winner: ${data.w.player.id} | ${playerLeveledUp}\nLoser: ${data.l.player.id}`)
 })
 
 socket.on('redirect', endpoint => window.location.pathname = endpoint)

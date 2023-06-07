@@ -10,13 +10,13 @@ class Game {
         this.turnCount = 1
     }
 
-    join(socketID: string, globalID: string, cardData: string): void {
+    join(socketID: string, globalID: string, cardData: string, playerName: string): void {
         if (this.players.length < 3) {
             const cards = JSON.parse(cardData)
             console.log(cards)
             const deckMap = new Map
             for (const [name, count] of Object.entries(cards)) deckMap.set(name, [{ ..._cardList[name] }, count])
-            const p = new Player({ id: globalID, socketID: socketID, deck: new Deck({ deckMap: deckMap }), isTakingTurn: this.players.length === 0 ? true : false, health: 30})
+            const p = new Player({ id: globalID, name: playerName, socketID: socketID, deck: new Deck({ deckMap: deckMap }), isTakingTurn: this.players.length === 0 ? true : false, health: 30})
             // Set initial energy count, energy is based on what turn it is
             p.energy = this.turnCount
             this.players.push(p)
@@ -80,11 +80,11 @@ class Game {
         this.players[1].isTakingTurn = this.players[1].isTakingTurn ? false : true
     }
 
-    checkGameOver(): { w: Player, l: Player } | boolean {
+    checkGameOver(): { w: {player: Player, exp: number}, l: {player: Player, exp: number} } | boolean {
         const P1 = this.players[0]
         const P2 = this.players[1]
         if (P1.health <= 0 || P2.health <= 0) {
-            return { w: P1.health > 0 ? P1 : P2, l: P1.health <= 0 ? P1 : P2 }
+            return { w: { player: P1.health > 0 ? P1 : P2, exp: 5 }, l: { player: P1.health <= 0 ? P1 : P2, exp: 2 } }
         }
         return false
     }

@@ -29,6 +29,17 @@ const DEBUG_DECK: { [name: string]: number } = {}
 for (const entry in cardList) DEBUG_DECK[entry] = 2 
 const STRING_DEBUG_DECK = JSON.stringify(DEBUG_DECK)
 
+// f(x) = x / (L + C) where x is exp to next level, L is current level, and C is some constant
+const C = 10
+
+function calculateLevelProgress(exp: number, currentLevel: number): number {
+    return exp / ( currentLevel + C )
+}
+
+function calculateLevelProgressRollover(progressToNextLevel: number, currentLevel: number): number {
+    return progressToNextLevel * ( currentLevel + C )
+}
+
 app.use(morgan(':remote-addr :method :url :status :response-time ms :res[content-length]'))
 app.use(bodyParser.urlencoded({ extended: false }))
 app.use(express.static('../public'))
@@ -110,7 +121,7 @@ app.post('/profile/cardlist', (req: express.Request, res: express.Response) => {
     console.log(req.signedCookies)
     // Query db based off uuid in signed cookies
     if (!req.signedCookies.rememberme) return res.send({ status: 'User not logged in', state: 0, success: false })
-    connection.query('SELECT id, username, preferences, selectedDeck FROM users WHERE uuid = ?;', [req.signedCookies.rememberme], (err, userData) => {
+    connection.query('SELECT id, username, preferences, selectedDeck, exp, level, gamesWon, gamesPlayed FROM users WHERE uuid = ?;', [req.signedCookies.rememberme], (err, userData) => {
         if (err) {
             console.error(err)
             return res.status(500).send({ status: 'Internal server error', state: -1, success: false })
@@ -122,7 +133,7 @@ app.post('/profile/cardlist', (req: express.Request, res: express.Response) => {
                 console.error(err)
                 return res.status(500).send({ status: 'Internal server error', state: -1, success: false })
             }
-
+            userData[0].expForNextLevel = calculateLevelProgressRollover(1, userData[0].level)
             return res.send({ status: { cardList: cardList, inventory: JSON.parse(data[0][0].cards), orichalcum: data[0][0].orichalcum, deckData: data[1], userData: userData[0] }, state: 1, success: true })
         })
     })
@@ -230,7 +241,7 @@ interface Player {
 
 interface Game {
     players: Array<Player>
-    join(socketID: string, id: string, cardData: string): void
+    join(socketID: string, id: string, cardData: string, playerName: string): void
     [key: string]: any
 }
 
@@ -250,19 +261,19 @@ io.on('connection', (socket: Socket) => {
         // Verify user
         const originalCookie = decode(`${socket.handshake.headers.cookie}`.split('; ').find(e => e.toLowerCase().startsWith('rememberme')).replace('rememberme=', '')) || null
         const validCookie = originalCookie ? cookieParser.signedCookie(originalCookie, config.cookie_secret) : null
-        // Check cookie and uuid, should this be moved to on join listener?
+        // Check cookie and uuid
         const validUUID = uuid.validate(validCookie)
         const validUUIDVersion = uuid.version(validCookie) === 4
         if (validCookie && validCookie !== originalCookie && validUUID && validUUIDVersion) {
             // Valid session and uuid
-            connection.query('SELECT id, selectedDeck FROM users WHERE uuid = ?;', [validCookie], (err, userData) => {
+            connection.query('SELECT id, selectedDeck, username FROM users WHERE uuid = ?;', [validCookie], (err, userData) => {
                 if (err) {
                     console.error(err)
                     socket.emit('err', 'DB: Server Error')
                     return
                 }
                 console.log(userData)
-                const { id, selectedDeck } = userData[0]
+                const { id, selectedDeck, username:playerName } = userData[0]
                 globalPlayerID = id
                 connection.query('SELECT cards FROM decks WHERE userID = ? AND name = ?;', [id, selectedDeck], (err, deckData) => {
                     if (err) {
@@ -274,15 +285,14 @@ io.on('connection', (socket: Socket) => {
                     console.log(deckData)
                     const { cards } = deckData[0]
                     console.log(cards)
-                    // At some point we will need user data such as some sort of session cookie to determine whose playing
                     if (isGameWaitingForPlayers) {
-                        games[games.length - 1].join(socket.id, id, cards)
+                        games[games.length - 1].join(socket.id, id, cards, playerName)
                         isGameWaitingForPlayers = false
                     } else {
                         // Create and join a new game instance
                         const newGame = new Game()
                         games.push(newGame)
-                        games[games.length - 1].join(socket.id, id, cards)
+                        games[games.length - 1].join(socket.id, id, cards, playerName)
                         isGameWaitingForPlayers = true
                     }
                     players[socket.id] = games[games.length - 1]
@@ -377,7 +387,6 @@ io.on('connection', (socket: Socket) => {
 
     socket.on('attack', async (data: { attackingCard?: Card, defendingCard?: Card, attackingCardCount?: number, defendingCardCount?: number }) => {
         console.log(data)
-        console.log(data.attackingCard)
         const game = players[socket.id]
         const attacker = game.players.find(p => p.id === globalPlayerID)
         const defender = game.players.find(p => p.id !== globalPlayerID)
@@ -396,8 +405,45 @@ io.on('connection', (socket: Socket) => {
             io.sockets.sockets.get(defender.socketID).emit('attackResult', res, data.attackingCardCount, data.defendingCardCount)
             const gameOver = game.checkGameOver()
             if (gameOver) {
-                socket.emit('gameOver', gameOver)
-                io.sockets.sockets.get(defender.socketID).emit('gameOver', gameOver)
+                let opponentLevelUp = false
+                let playerLeveledUp = false
+                connection.query('SELECT * FROM users WHERE id = ?; SELECT * FROM users WHERE id = ?;', [globalPlayerID, defender.id], (err, data) => {
+                    if (err) {
+                        console.error(err)
+                        socket.emit('gameOver', null)
+                        io.sockets.sockets.get(defender.socketID).emit('gameOver', null)
+                        return
+                    }
+
+                    const player = data[0][0]
+                    const opponent = data[1][0]
+                    // TODO: Move away from hard coded exp reward values
+                    let playerExpCount = player.exp + gameOver[gameOver.w.player.id === globalPlayerID ? 'w' : 'l'].exp
+                    let opponentExpCount = opponent.exp + gameOver[gameOver.w.player.id !== globalPlayerID ? 'w' : 'l'].exp
+                    const playerLevelProgress = calculateLevelProgress(playerExpCount, player.level)
+                    const opponentLevelProgress = calculateLevelProgress(opponentExpCount, opponent.level)
+                    playerLeveledUp = playerLevelProgress >= 1
+                    opponentLevelUp = opponentLevelProgress >= 1
+                    if (playerLeveledUp) playerExpCount = calculateLevelProgressRollover(playerLevelProgress - 1, player.level)
+                    if (opponentLevelUp) opponentExpCount = calculateLevelProgressRollover(opponentLevelProgress - 1, opponent.level)
+                    connection.query('UPDATE users SET level = level + ?, exp = ?, gamesPlayed = gamesPlayed + 1, gamesWon = gamesWon + ? WHERE id = ?; UPDATE users SET level = level + ?, exp = ?, gamesPlayed = gamesPlayed + 1, gamesWon = gamesWon + ? WHERE id = ?; UPDATE inventory SET orichalcum = orichalcum + ? WHERE id = ?; UPDATE inventory SET orichalcum = orichalcum + ? WHERE id = ?;',
+                    [
+                        Math.floor(playerLevelProgress), playerExpCount, gameOver.w.player.id === globalPlayerID ? 1 : 0, globalPlayerID, 
+                        Math.floor(opponentLevelProgress), opponentExpCount, gameOver.w.player.id !== globalPlayerID ? 1 : 0, defender.id,
+                        gameOver.w.player.id === globalPlayerID ? 10 : 3, globalPlayerID,
+                        gameOver.w.player.id !== globalPlayerID ? 10 : 3, defender.id
+                    ],
+                    err => {
+                        if (err) {
+                            console.error(err)
+                            socket.emit('gameOver', null)
+                            io.sockets.sockets.get(defender.socketID).emit('gameOver', null)
+                            return
+                        }
+                        socket.emit('gameOver', gameOver, playerLeveledUp)
+                        io.sockets.sockets.get(defender.socketID).emit('gameOver', gameOver, opponentLevelUp)
+                    })
+                })
             }
         } else {
             socket.emit('err', 'One or more conditions failed for attack event')

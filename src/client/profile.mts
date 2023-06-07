@@ -27,6 +27,11 @@ interface fetchResponseObject {
             username: string
             preferences: string | null
             selectedDeck: string
+            exp: number
+            level: number
+            gamesWon: number
+            gamesPlayed: number
+            expForNextLevel: number
         }
         deckData: Array<{
             deckID: number
@@ -141,7 +146,14 @@ async function populate() {
             cardData = data.status.cardList
             console.log(cardData)
             document.getElementById('user-name-display').innerText = data.status.userData.username || 'null'
-            document.getElementById('orichalcum-display').innerText = `${data.status.orichalcum}` || '0'
+            document.getElementById('orichalcum-display').innerText = `${data.status.orichalcum || 0}`
+            document.getElementById('current-exp').innerText = `${data.status.userData.exp || 0}`
+            // @ts-ignore Is there supposed to be another way of setting the inline style property/css variables? Look into later
+            document.getElementById('progress').style = `--progress: ${(data.status.userData.exp / data.status.userData.expForNextLevel) * 100 || 0}%;`
+            document.getElementById('next-level-exp').innerText = `${data.status.userData.expForNextLevel || 0}`
+            document.getElementById('user-level-display').innerText = `${data.status.userData.level || 0}`
+            document.getElementById('games-won-display').innerText = `${data.status.userData.gamesWon || 0}`
+            document.getElementById('games-played-display').innerText = `${data.status.userData.gamesPlayed || 0}`
             for (const prop in data.status.inventory) {
                 const cardElement = generateHTML(data.status.cardList[prop], data.status.inventory[prop])
                 cardElement.addEventListener('contextmenu', (e: MouseEvent) => {

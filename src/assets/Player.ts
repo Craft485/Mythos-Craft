@@ -1,6 +1,7 @@
 interface _PlayerProps {
     deck: Deck
     id: string | number
+    name: string
     socketID: string
     health: number
     energy?: number
@@ -9,6 +10,7 @@ interface _PlayerProps {
 
 class Player {
     deck: Deck
+    name: string
     id: string | number
     socketID: string
     health: number
@@ -17,6 +19,7 @@ class Player {
     hand: Array<Card>
     constructor (props: _PlayerProps) {
         this.id = props.id
+        this.name = props.name
         this.socketID = props.socketID
         this.deck = props.deck
         this.isTakingTurn = props.isTakingTurn || false
