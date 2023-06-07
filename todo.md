@@ -16,7 +16,15 @@ A general checklist of things still to be added/change
 
 - [x] Use stored deck data when starting a game
 
-- [ ] Add rewards for winning such as currency and exp
+- [x] Add rewards for winning such as currency and exp
+
+- [ ] Add wider variety of cards
+
+- [ ] Add sets of cards(based on the mythology they are derived from)
+
+- [ ] Add more card information on hover
+
+- [ ] Add user profile overview on hover of opponents health(name and level, maybe some other things)
 
 ## General
 
@@ -25,3 +33,5 @@ A general checklist of things still to be added/change
 - [ ] Add shop page
 
 - [ ] Add a `README.md`
+
+- [ ] Add ability to view other players profile pages
