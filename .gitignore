@@ -5,5 +5,4 @@ test
 *.txt
 out
 src/config.json
-public/bg
 local
