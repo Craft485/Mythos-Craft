@@ -42,6 +42,7 @@ class Game {
                     count++
                     return recurse()
                 }
+                return true
             }()
         } else {
             // Add item card to discard

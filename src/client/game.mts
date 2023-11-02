@@ -161,6 +161,7 @@ function play(cardNameWithCount: string) {
                     count++
                     return recurse()
                 }
+                return true
             }()
             // A hopefully temp fix to keeping count consistent between the game state and the ui
             const element = document.querySelector(`#${_myField.id} .${cardNameWithCount}`)
@@ -299,6 +300,7 @@ socket.on('newCard', (card, itemCheck) => {
                 count++
                 return recurse()
             }
+            return true
         }()
         // UI
         const e = generateHTML(card, `_${count}`)
@@ -383,6 +385,7 @@ socket.on('opponentPlay', data => {
             count++
             return recurse()
         }
+        return true
     }()
     // Update UI
     document.getElementsByClassName('card-b')[0].remove()
