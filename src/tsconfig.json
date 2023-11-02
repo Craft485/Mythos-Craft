@@ -2,7 +2,7 @@
     "compilerOptions": {
         "target": "ES2021",
         "module": "CommonJS",
-        "moduleResolution": "nodenext",
+        // "moduleResolution": "nodenext",
         "resolveJsonModule": true,
         "outDir": "../out",
         "removeComments": true,

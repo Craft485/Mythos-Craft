@@ -4,6 +4,7 @@
         "outDir": "../../out/client",
         "removeComments": true,
         "declaration": true,
+        "module": "NodeNext",
         "moduleResolution": "nodenext"
     }
 }
